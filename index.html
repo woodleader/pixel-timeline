@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pixel Timeline</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <h1>Pixel Timeline</h1>
+        <p>Build your timeline of video game releases with live WebRTC lobbies.</p>
+        <p><a href="library-tool.html">Library tool</a></p>
+      </header>
+
+      <div class="layout">
+        <aside class="sidebar">
+          <section class="panel" id="settingsPanel">
+            <h2>Settings</h2>
+            <div class="row">
+              <label for="username">Username</label>
+              <input id="username" type="text" maxlength="18" placeholder="Your name" autocomplete="off" />
+            </div>
+          </section>
+
+          <section class="panel" id="lobbySection">
+            <h2>Lobby</h2>
+            <p id="status">No active lobby.</p>
+            <div class="row">
+              <button id="createLobby">Create lobby</button>
+              <button id="joinLobby">Join lobby</button>
+            </div>
+            <div class="row">
+              <label for="roomCode">Room code</label>
+              <input id="roomCode" maxlength="6" placeholder="Enter 6-char code" />
+            </div>
+            <div id="roomInfo" class="hidden row">
+              <span>Room code: <strong id="roomCodeLabel"></strong></span>
+              <button id="copyRoom">Copy</button>
+              <button id="leaveLobby">Disconnect</button>
+            </div>
+            <p id="hostBadge" class="muted hidden">You are the host.</p>
+          </section>
+
+          <section class="panel" id="currentPlayerSection">
+            <h2>Current player</h2>
+            <p id="currentPlayerInfo" class="muted">Not connected.</p>
+            <p id="currentRoomState" class="muted">Lobby not initialized.</p>
+            <h3>Players</h3>
+            <ol id="playerList"></ol>
+          </section>
+        </aside>
+
+        <div class="mainArea">
+          <section class="panel">
+            <h2>Lobby actions</h2>
+            <div class="row">
+              <button id="startGame" disabled>Start game</button>
+            </div>
+          </section>
+
+          <section id="gameSection" class="panel hidden">
+            <h2>Live game</h2>
+            <div class="grid">
+              <div>
+                <p id="turnInfo" class="muted"></p>
+                <p id="deckInfo" class="muted"></p>
+              </div>
+              <p id="roundMessage" class="muted"></p>
+            </div>
+
+            <div id="promptCardWrap" class="prompt hidden">
+              <h3>Active screenshot</h3>
+              <img id="promptImage" alt="Current screenshot to guess" />
+              <div id="promptMeta" class="muted"></div>
+            </div>
+
+            <div class="guessArea panel">
+              <h3>Your move</h3>
+              <div class="row">
+                <label for="positionSelect">Placement</label>
+                <select id="positionSelect"></select>
+                <button id="placeCardBtn" disabled>Place card</button>
+              </div>
+              <div class="row">
+                <label for="guessTitleInput">Guess title</label>
+                <input
+                  id="guessTitleInput"
+                  type="text"
+                  list="titleSuggestions"
+                  placeholder="title (bonus reward)"
+                  autocomplete="off"
+                />
+                <datalist id="titleSuggestions"></datalist>
+              </div>
+              <div class="row">
+                <label for="guessStudioInput">Guess studio</label>
+                <input
+                  id="guessStudioInput"
+                  type="text"
+                  list="studioSuggestions"
+                  placeholder="studio (bonus reward)"
+                  autocomplete="off"
+                />
+                <datalist id="studioSuggestions"></datalist>
+              </div>
+              <p id="guessStatus" class="muted"></p>
+            </div>
+
+            <div class="panel">
+              <h3>Token actions (active player)</h3>
+              <div class="row">
+                <button id="rerollBtn">GLITCH-Roll (-1 token)</button>
+                <button id="autoPlaceBtn">Auto-place next card (-3 tokens)</button>
+              </div>
+              <p class="muted" id="placementHint">On your turn: spend tokens, place the card by choosing its position.</p>
+            </div>
+
+            <div id="challengeWrap" class="panel hidden">
+              <h3>GLITCH! on opponent turn</h3>
+              <div class="row">
+                <label for="glitchPosition">Your position guess</label>
+                <select id="glitchPosition"></select>
+                <button id="glitchBtn" disabled>Shout GLITCH! (-1 token)</button>
+              </div>
+              <p class="muted" id="challengeHint">During another player's turn, guess where they think this card belongs.</p>
+            </div>
+
+            <section>
+              <h3>Rows</h3>
+              <div id="rowsArea"></div>
+            </section>
+          </section>
+
+          <details class="panel logPanel">
+            <summary>Activity</summary>
+            <div id="logWrap">
+              <div id="log"></div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

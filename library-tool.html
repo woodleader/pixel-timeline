@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pixel Timeline Library Tool</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="library-tool.js" defer></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <h1>Pixel Timeline Library Tool</h1>
+        <p>
+          This page runs fully on GitHub Pages with no server backend. It builds an updated
+          <code>games.json</code> and <code>game-images.json</code> you can download and commit to the repo.
+        </p>
+        <p><a href="index.html">Back to game</a></p>
+      </header>
+
+      <section class="panel">
+        <h2>Edit library</h2>
+        <div class="layout admin-layout">
+          <form id="cardForm" class="panel">
+            <h3 id="formTitle">Add game</h3>
+            <div class="row">
+              <label for="gameTitle">Game title</label>
+              <input id="gameTitle" type="text" maxlength="120" required />
+            </div>
+            <div class="row">
+              <label for="gameStudio">Studio</label>
+              <input id="gameStudio" type="text" maxlength="120" required />
+            </div>
+            <div class="row">
+              <label for="gameYear">Release year</label>
+              <input id="gameYear" type="number" min="1970" max="2100" required />
+            </div>
+            <div class="row">
+              <label for="screenshotUrl">Screenshot URL</label>
+              <input id="screenshotUrl" type="url" placeholder="https://... (optional if using file)" />
+            </div>
+            <div class="row">
+              <label for="screenshotFile">Upload screenshot</label>
+              <input id="screenshotFile" type="file" accept="image/*" />
+            </div>
+            <div class="row">
+              <button id="saveCard" type="submit">Save game</button>
+              <button id="clearForm" type="button">Clear</button>
+            </div>
+            <p id="formStatus" class="muted"></p>
+            <div class="row">
+              <label for="screenshotPreview">Preview</label>
+              <img id="screenshotPreview" alt="Screenshot preview" class="admin-preview" />
+            </div>
+          </form>
+
+          <div class="panel">
+            <h3>Export / Import</h3>
+            <div class="row">
+              <button id="exportGames">Export games.json</button>
+              <button id="exportImages">Export game-images.json</button>
+            </div>
+            <div class="row">
+              <input id="importGamesFile" type="file" accept="application/json" />
+              <button id="importBtn">Import games.json</button>
+            </div>
+            <div class="row">
+              <input id="importImagesFile" type="file" accept="application/json" />
+              <button id="importImagesBtn">Import game-images.json</button>
+            </div>
+            <p id="fileStatus" class="muted">Loading library files...</p>
+            <p class="muted">Tip: save both exported files in your repo and commit to publish changes.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Current game list</h2>
+        <p id="librarySummary" class="muted"></p>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Title</th>
+                <th>Studio</th>
+                <th>Year</th>
+                <th>Image ID</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="libraryRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
