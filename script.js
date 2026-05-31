@@ -102,6 +102,7 @@ let suggestionTitles = [];
 let suggestionStudios = [];
 let gameCardById = new Map();
 let gameCardByImageId = new Map();
+let localLibraryHash = "";
 const sessionId = getOrCreateSessionId();
 let guideState = loadGuideState();
 
@@ -157,6 +158,11 @@ const ui = {
   uploadPanel: $("uploadPanel"),
   connDiag: $("connDiag"),
   loadLibraryFilesBtn: $("loadLibraryFilesBtn"),
+  libraryMismatchPanel: $("libraryMismatchPanel"),
+  mismatchGamesFile: $("mismatchGamesFile"),
+  mismatchImagesFile: $("mismatchImagesFile"),
+  mismatchLoadBtn: $("mismatchLoadBtn"),
+  mismatchStatus: $("mismatchStatus"),
   matchStatusSection: $("matchStatusSection"),
   matchPhaseSummary: $("matchPhaseSummary"),
   matchRuleSummary: $("matchRuleSummary"),
@@ -549,6 +555,23 @@ function fallbackLibraryCards() {
   return DEFAULT_GAME_LIBRARY.map((card) => ({ ...card }));
 }
 
+function computeLibraryHash(cards = GAME_CARDS) {
+  const sorted = [...cards].sort((a, b) => (a.id > b.id ? 1 : a.id < b.id ? -1 : 0));
+  let h = 5381;
+  const feed = (value) => {
+    const s = String(value);
+    for (let i = 0; i < s.length; i += 1) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  };
+  feed(`${cards.length}|`);
+  for (const card of sorted) feed(`${card.id}|${card.title}|${card.studio}|${card.year}|${card.image || ""}\n`);
+  return h.toString(16);
+}
+
+function refreshLocalLibraryHash() {
+  localLibraryHash = computeLibraryHash();
+  return localLibraryHash;
+}
+
 function reindexGameCards() {
   gameCardById = new Map();
   gameCardByImageId = new Map();
@@ -602,13 +625,6 @@ function hydrateSyncedState(state = {}) {
   };
 }
 
-function librarySyncCards() {
-  return GAME_CARDS.map(({ id, title, studio, year, imageId, image }) => ({
-    id, title, studio, year, imageId,
-    image: image && !image.startsWith("data:") ? image : ""
-  }));
-}
-
 function syncCardForPeer(card = {}) {
   if (!card || typeof card !== "object") return card;
   return { ...card, image: "" };
@@ -658,6 +674,7 @@ function applyUploadedLibrary(gamesPayload, imageManifest = {}) {
   GAME_CARDS = normalized;
   reindexGameCards();
   refreshSearchIndex();
+  refreshLocalLibraryHash();
   updateSuggestions("", suggestionTitles, ui.titleSuggestions);
   updateSuggestions("", suggestionStudios, ui.studioSuggestions);
 }
@@ -680,8 +697,50 @@ async function handleLibraryUpload() {
     applyUploadedLibrary(gamesPayload, imageManifest);
     setLibraryStatus(`Loaded ${GAME_CARDS.length} cards from uploaded files.`, "ok");
     log(`Library loaded from uploaded files: ${GAME_CARDS.length} cards.`);
+    propagateLibraryHash();
   } catch (error) {
     setLibraryStatus(`Failed to load uploaded files: ${error.message}`, "error");
+  }
+}
+
+async function handleMismatchUpload() {
+  const gamesFile = ui.mismatchGamesFile?.files?.[0];
+  if (!gamesFile) {
+    ui.mismatchStatus.textContent = "Select the host's games.json first.";
+    ui.mismatchStatus.className = "muted error";
+    return;
+  }
+  const imageFile = ui.mismatchImagesFile?.files?.[0];
+  try {
+    ui.mismatchStatus.textContent = "Reading library...";
+    ui.mismatchStatus.className = "muted";
+    const gamesPayload = await readJsonFromFile(gamesFile);
+    const imageManifest = imageFile ? await readJsonFromFile(imageFile) : {};
+    applyUploadedLibrary(gamesPayload, imageManifest);
+    propagateLibraryHash();
+    if (isLibraryMismatched()) {
+      ui.mismatchStatus.textContent = "Loaded, but still doesn't match the host. Make sure you're using the exact same files (including game-images.json).";
+      ui.mismatchStatus.className = "muted error";
+    } else {
+      ui.mismatchStatus.textContent = "Matched! You can ready up now.";
+      ui.mismatchStatus.className = "muted ok";
+    }
+    renderLibraryMismatch();
+    updateReadyUI();
+  } catch (error) {
+    ui.mismatchStatus.textContent = `Failed to load: ${error.message}`;
+    ui.mismatchStatus.className = "muted error";
+  }
+}
+
+function propagateLibraryHash() {
+  if (isHost && hostState) {
+    hostState.libraryHash = localLibraryHash;
+    const me = hostGetPlayer(playerId);
+    if (me) me.libraryHash = localLibraryHash;
+    hostBroadcastState(hostState.revealCurrent);
+  } else if (hostConnection && hostConnection.open) {
+    hostConnection.send({ type: "library-hash", hash: localLibraryHash });
   }
 }
 
@@ -704,6 +763,7 @@ async function loadGameLibrary() {
   }
   reindexGameCards();
   refreshSearchIndex();
+  refreshLocalLibraryHash();
 }
 
 function levenshtein(a, b) {
@@ -981,15 +1041,30 @@ function updateRuleControls() {
     : "Title and studio requires both fields to be correct for any guess to win.";
 }
 
+function isLibraryMismatched() {
+  if (isHost) return false;
+  const hostHash = gameState.libraryHash || "";
+  if (!hostHash) return false; // host's hash not known yet
+  return hostHash !== localLibraryHash;
+}
+
+function renderLibraryMismatch() {
+  const mismatch = isLibraryMismatched();
+  ui.libraryMismatchPanel.classList.toggle("hidden", !mismatch || !gameState.roomCode);
+}
+
 function updateReadyUI() {
   const me = currentPlayerState();
-  const canReady = lobbyMode !== "idle" && !gameState.started && !!me;
+  const mismatch = isLibraryMismatched();
+  const canReady = lobbyMode !== "idle" && !gameState.started && !!me && !mismatch;
   ui.readyToggleBtn.disabled = !canReady;
-  ui.readyToggleBtn.textContent = me?.ready ? "Not yet" : "I'm ready";
+  ui.readyToggleBtn.textContent = mismatch ? "Library mismatch" : me?.ready ? "Not yet" : "I'm ready";
   const counts = readyCounts();
   ui.lobbyReadySummary.textContent = gameState.started
     ? "Match is live."
-    : `${counts.ready} of ${counts.connected} players locked in. Everyone needs to be ready before the match starts.`;
+    : mismatch
+      ? "Your library doesn't match the host's — upload the host's files to ready up."
+      : `${counts.ready} of ${counts.connected} players locked in. Everyone needs to be ready before the match starts.`;
   const guideSoftState = guideState.completed ? "Guide completed." : guideState.skipped ? "Guide skipped." : "Haven't seen the guide yet.";
   ui.rulesChangedNotice.textContent = gameState.rulesNotice || guideSoftState;
 }
@@ -1011,14 +1086,29 @@ function updateSidebarStatus() {
     : "No match yet.";
 }
 
+function lobbyLibraryMismatchNames() {
+  return gameState.players
+    .filter((player) => player.connected !== false && player.libraryMatches === false)
+    .map((player) => player.name);
+}
+
 function renderLobbySummary() {
   const rules = normalizeRules(gameState.rules || DEFAULT_RULES);
   ui.matchSummaryText.textContent = ruleSummaryText(rules);
-  const canStart = Boolean(isHost && !gameState.started && gameState.players.length >= 2 && gameState.players.every((player) => player.connected !== false && player.ready));
+  const mismatchNames = lobbyLibraryMismatchNames();
+  const canStart = Boolean(
+    isHost && !gameState.started && gameState.players.length >= 2 &&
+    gameState.players.every((player) => player.connected !== false && player.ready) &&
+    mismatchNames.length === 0
+  );
   ui.startGame.disabled = !canStart;
   if (isHost && !gameState.started && !canStart) {
     const counts = readyCounts();
-    ui.startGame.textContent = counts.connected < 2 ? "Need 2 players" : "Waiting on everyone";
+    if (mismatchNames.length) {
+      ui.startGame.textContent = `Library mismatch: ${mismatchNames.join(", ")}`;
+    } else {
+      ui.startGame.textContent = counts.connected < 2 ? "Need 2 players" : "Waiting on everyone";
+    }
   } else {
     ui.startGame.textContent = "Launch match";
   }
@@ -1458,6 +1548,7 @@ function applyState(state, myStablePlayerId = "") {
   updateLobbyActionVisibility();
   updateRuleControls();
   renderGuideAndReadyControls();
+  renderLibraryMismatch();
   renderPlayerList(gameState.players || []);
   renderStatusText();
   updateSidebarStatus();
@@ -1509,6 +1600,7 @@ function hostBuildStateForViewer(viewerPeerId, revealCurrent = hostState?.reveal
       tokens: player.tokens,
       ready: Boolean(player.ready),
       connected: player.connected !== false,
+      libraryMatches: (player.libraryHash || "") === (hostState.libraryHash || ""),
       row: Array.isArray(player.row) ? player.row.map(syncCardForPeer) : []
     })),
     started: hostState.started,
@@ -1523,6 +1615,7 @@ function hostBuildStateForViewer(viewerPeerId, revealCurrent = hostState?.reveal
     roundMessage: hostState.roundMessage,
     roundPulse: hostState.roundPulse,
     rulesNotice: hostState.rulesNotice,
+    libraryHash: hostState.libraryHash || "",
     myPlayerId: viewerId
   };
 }
@@ -1598,6 +1691,7 @@ function hostAddPlayer(payload, peerKey) {
     row: [],
     ready: false,
     connected: true,
+    libraryHash: payload.libraryHash || "",
     guideCompleted: Boolean(payload.guideCompleted),
     guideSkipped: Boolean(payload.guideSkipped)
   };
@@ -1679,6 +1773,7 @@ function hostStartLobby() {
       row: [],
       ready: false,
       connected: true,
+      libraryHash: localLibraryHash,
       guideCompleted: guideState.completed,
       guideSkipped: guideState.skipped
     };
@@ -1699,7 +1794,8 @@ function hostStartLobby() {
       roundResult: null,
       roundMessage: "Room open. Share the code.",
       roundPulse: "none",
-      rulesNotice: ""
+      rulesNotice: "",
+      libraryHash: localLibraryHash
     };
     hostConnections = {};
     playerId = hostPlayer.id;
@@ -1752,6 +1848,12 @@ function handleHostPayload(conn, payload) {
     return;
   }
 
+  if (payload.type === "library-hash") {
+    actor.libraryHash = payload.hash || "";
+    hostBroadcastState(hostState.revealCurrent);
+    return;
+  }
+
   if (payload.type === "toggle-ready") {
     if (hostState.started) return;
     actor.ready = !actor.ready;
@@ -1793,22 +1895,13 @@ function handleHostPayload(conn, payload) {
   }
 }
 
-function hostSendLibraryLater(conn) {
-  // Defer the large library payload so it can't choke the data channel
-  // before the small, critical lobby-state has been delivered.
-  setTimeout(() => {
-    if (hostConnections[conn.peer] === conn && conn.open) {
-      conn.send({ type: "library-sync", cards: librarySyncCards() });
-    }
-  }, 800);
-}
-
 function handleHostJoinRequest(conn, payload) {
   const existing = hostFindPlayerBySession(payload.sessionId);
   if (existing) {
     existing.peerId = conn.peer;
     existing.connected = true;
     existing.name = hostBuildUniqueName(payload.username || existing.name, existing.id);
+    existing.libraryHash = payload.libraryHash || "";
     hostUpdateGuideState(existing, payload);
     conn.send({ type: "system", message: `Welcome back, ${existing.name}. You're in.`, kind: "ok" });
     if (hostState.phase === "paused" && hostState.pausedState?.playerId === existing.id) {
@@ -1819,7 +1912,6 @@ function handleHostJoinRequest(conn, payload) {
       hostState.roundMessage = `${existing.name} is back. Turn resumes.`;
     }
     hostBroadcastState(hostState.revealCurrent);
-    hostSendLibraryLater(conn);
     return;
   }
 
@@ -1837,7 +1929,6 @@ function handleHostJoinRequest(conn, payload) {
   conn.send({ type: "system", message: `You're in, ${player.name}. Get ready.`, kind: "ok" });
   hostSystem(`${player.name} joined the room.`, "ok");
   hostBroadcastState();
-  hostSendLibraryLater(conn);
 }
 
 function handleHostDisconnect(peerKey) {
@@ -1865,6 +1956,7 @@ function buildJoinPayload(username) {
     type: "join-request",
     username,
     sessionId,
+    libraryHash: localLibraryHash,
     guideCompleted: guideState.completed,
     guideSkipped: guideState.skipped
   };
@@ -1981,19 +2073,10 @@ function connectToHost(code, username, attempt = 0) {
   hostConnection.on("data", (message) => {
     if (clientConnectionGen !== myGen) return;
     if (!message || !message.type) return;
-    connTraceEvent(`rx:${message.type}`, message.type === "lobby-state" ? "ok" : "warn");
     if (message.type === "lobby-state") {
+      setConnDiag(""); // healthy — clear the diagnostic banner
+      connTrace = [];
       applyState(message.state, message.myPlayerId);
-      return;
-    }
-    if (message.type === "library-sync") {
-      if (Array.isArray(message.cards) && message.cards.length) {
-        GAME_CARDS = message.cards;
-        reindexGameCards();
-        refreshSearchIndex();
-        setLibraryStatus(`Library synced from host: ${GAME_CARDS.length} cards.`, "ok");
-        log(`Library synced from host: ${GAME_CARDS.length} cards.`);
-      }
       return;
     }
     if (message.type === "system") {
@@ -2083,6 +2166,11 @@ function hostHandleStartGame() {
   const everyoneReady = hostState.players.length >= 2 && hostState.players.every((player) => player.connected !== false && player.ready);
   if (!everyoneReady) {
     showStatus("Not everyone's ready. Wait for all players.", "warn");
+    return;
+  }
+  const mismatched = hostState.players.filter((player) => player.connected !== false && (player.libraryHash || "") !== (hostState.libraryHash || ""));
+  if (mismatched.length) {
+    hostSystem(`Can't start — library mismatch: ${mismatched.map((player) => player.name).join(", ")}.`, "warn");
     return;
   }
   if (!GAME_CARDS.length) {
@@ -2657,6 +2745,7 @@ function bindEvents() {
   ui.hostBackBtn.addEventListener("click", () => setLobbyMode("idle"));
   ui.joinBackBtn.addEventListener("click", () => setLobbyMode("idle"));
   ui.loadLibraryFilesBtn.addEventListener("click", handleLibraryUpload);
+  ui.mismatchLoadBtn.addEventListener("click", handleMismatchUpload);
   ui.createLobby.addEventListener("click", hostStartLobby);
   ui.joinLobby.addEventListener("click", joinLobby);
   ui.copyRoom.addEventListener("click", async () => {

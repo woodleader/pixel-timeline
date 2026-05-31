@@ -121,6 +121,23 @@
               <p class="muted">Read the rules, take the guide or skip it, then lock in when you're ready.</p>
             </section>
 
+            <section class="panel libraryMismatchPanel hidden" id="libraryMismatchPanel">
+              <h2>⚠ Library mismatch</h2>
+              <p class="muted">Your game library doesn't match the host's. Upload the same <code>games.json</code> (and <code>game-images.json</code>) the host is using so everyone plays the same deck and images.</p>
+              <div class="row">
+                <label for="mismatchGamesFile">games.json</label>
+                <input id="mismatchGamesFile" type="file" accept="application/json,.json" />
+              </div>
+              <div class="row">
+                <label for="mismatchImagesFile">game-images.json (optional)</label>
+                <input id="mismatchImagesFile" type="file" accept="application/json,.json" />
+              </div>
+              <div class="row">
+                <button id="mismatchLoadBtn" type="button">Load &amp; match</button>
+              </div>
+              <p id="mismatchStatus" class="muted"></p>
+            </section>
+
             <section class="panel lobbyPrimary">
               <div class="lobbyPrimaryHeader">
                 <div>
