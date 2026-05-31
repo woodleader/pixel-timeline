@@ -856,6 +856,18 @@ details > summary::-webkit-details-marker { display: none; }
 
 .logPanel { background: rgba(14, 10, 4, 0.70); }
 
+.debugToggle {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.15);
+  font-size: 0.7rem;
+  padding: 0;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.debugToggle:hover { color: rgba(255,255,255,0.4); }
+
 .logPanel summary { margin-bottom: 12px; }
 
 #logWrap { max-height: 260px; overflow: auto; }

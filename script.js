@@ -2680,6 +2680,11 @@ function bindEvents() {
   ui.opponentGuessTitle.addEventListener("input", () => updateSuggestions(ui.opponentGuessTitle.value, suggestionTitles, ui.titleSuggestions));
   ui.opponentGuessStudio.addEventListener("input", () => updateSuggestions(ui.opponentGuessStudio.value, suggestionStudios, ui.studioSuggestions));
   ui.username.addEventListener("input", () => saveUsername(ui.username.value));
+  $("debugToggleBtn").addEventListener("click", () => {
+    const panel = $("logPanel");
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) panel.open = true;
+  });
 }
 
 async function initialize() {

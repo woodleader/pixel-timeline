@@ -385,8 +385,8 @@
             <datalist id="studioSuggestions"></datalist>
           </section>
 
-          <details class="panel logPanel">
-            <summary>Activity</summary>
+          <details class="panel logPanel hidden" id="logPanel">
+            <summary>Activity log</summary>
             <div id="logWrap">
               <div id="log"></div>
             </div>
@@ -394,6 +394,7 @@
 
           <footer class="pageFooter">
             <a href="library-tool.html" class="footerLink">Library tool</a>
+            <button id="debugToggleBtn" type="button" class="debugToggle" title="Toggle activity log">Debug</button>
           </footer>
         </div>
       </div>
