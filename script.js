@@ -632,6 +632,20 @@ function syncCardForPeer(card = {}) {
   return { ...card, image: "" };
 }
 
+// Recursively blank every `image` string so large base64 data URLs never
+// travel over the data channel. Clients rehydrate images locally by card id.
+function stripImagesDeep(value) {
+  if (Array.isArray(value)) {
+    value.forEach(stripImagesDeep);
+  } else if (value && typeof value === "object") {
+    for (const key of Object.keys(value)) {
+      if (key === "image" && typeof value[key] === "string") value[key] = "";
+      else stripImagesDeep(value[key]);
+    }
+  }
+  return value;
+}
+
 function setLibraryStatus(message, type = "") {
   ui.libraryStatus.textContent = message;
   ui.libraryStatus.className = `muted ${type}`.trim();
@@ -1613,7 +1627,7 @@ function hostBuildStateForViewer(viewerPeerId, revealCurrent = hostState?.reveal
     revealCurrent: shouldReveal,
     guessWindow,
     pausedState: clone(hostState.pausedState),
-    roundResult: clone(hostState.roundResult),
+    roundResult: hostState.roundResult ? stripImagesDeep(clone(hostState.roundResult)) : null,
     roundMessage: hostState.roundMessage,
     roundPulse: hostState.roundPulse,
     rulesNotice: hostState.rulesNotice,
