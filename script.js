@@ -1555,15 +1555,42 @@ function renderRows() {
 function renderCard(card, showDetails = false) {
   const tile = document.createElement("article");
   tile.className = "card";
+
+  const inner = document.createElement("div");
+  inner.className = "card-inner";
+
+  const artWrap = document.createElement("div");
+  artWrap.className = "card-art";
   const image = document.createElement("img");
   image.src = card.image;
   image.alt = "Video game screenshot";
-  const titleLine = document.createElement("p");
-  titleLine.textContent = card.title;
-  const detailLine = document.createElement("p");
-  detailLine.className = "muted";
-  detailLine.textContent = showDetails ? `${card.year} • ${card.studio}` : `${card.studio} / ${card.year}`;
-  tile.append(image, titleLine, detailLine);
+  artWrap.appendChild(image);
+
+  const divider = document.createElement("div");
+  divider.className = "card-divider";
+
+  const body = document.createElement("div");
+  body.className = "card-body";
+
+  const titleEl = document.createElement("p");
+  titleEl.className = "card-title";
+  titleEl.textContent = card.title;
+
+  const footer = document.createElement("div");
+  footer.className = "card-footer";
+
+  const studio = document.createElement("span");
+  studio.className = "card-studio";
+  studio.textContent = card.studio;
+
+  const yearBadge = document.createElement("span");
+  yearBadge.className = "card-year-badge";
+  yearBadge.textContent = card.year;
+
+  footer.append(studio, yearBadge);
+  body.append(titleEl, footer);
+  inner.append(artWrap, divider, body);
+  tile.appendChild(inner);
   return tile;
 }
 
