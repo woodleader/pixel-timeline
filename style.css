@@ -1054,3 +1054,51 @@ details > summary::-webkit-details-marker { display: none; }
   .card { width: 196px; }
   .gapMarker { min-width: 130px; }
 }
+
+/* ── New host/join split flow ─────────────────────────────── */
+.choiceBtnRow {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.choiceBtn {
+  flex: 1;
+  padding: 14px 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.choiceBtn--secondary {
+  background: transparent;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+}
+
+.choiceBtn--secondary:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.panelBackRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.panelBackRow h2 { margin: 0; }
+
+.backBtn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.backBtn:hover { color: var(--fg); }
+
+@media (max-width: 600px) {
+  .choiceBtnRow { flex-direction: column; }
+}

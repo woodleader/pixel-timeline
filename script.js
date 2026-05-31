@@ -130,6 +130,14 @@ const ui = {
   lobbyScreen: $("lobbyScreen"),
   gameSection: $("gameSection"),
   username: $("username"),
+  choicePanel: $("choicePanel"),
+  showHostBtn: $("showHostBtn"),
+  showJoinBtn: $("showJoinBtn"),
+  hostSetupPanel: $("hostSetupPanel"),
+  hostBackBtn: $("hostBackBtn"),
+  joinSetupPanel: $("joinSetupPanel"),
+  joinBackBtn: $("joinBackBtn"),
+  roomInfoPanel: $("roomInfoPanel"),
   createLobby: $("createLobby"),
   joinLobby: $("joinLobby"),
   roomCodeInput: $("roomCode"),
@@ -936,16 +944,17 @@ function readyCounts() {
 
 function updateLobbyActionVisibility() {
   const connected = isConnectedToLobby();
-  const inSession = lobbyMode !== "idle";
   const hasRoom = Boolean(gameState.roomCode);
-  ui.uploadPanel.classList.toggle("hidden", inSession && !isHost);
-  ui.createLobby.classList.toggle("hidden", inSession);
-  ui.joinLobby.classList.toggle("hidden", inSession);
-  ui.roomCodeInput.classList.toggle("hidden", inSession);
-  ui.roomInfo.classList.toggle("hidden", !hasRoom || !inSession);
+  const inSession = lobbyMode !== "idle" && lobbyMode !== "host_setup" && lobbyMode !== "join_setup";
+
+  // Welcome-screen panels — mutually exclusive
+  ui.choicePanel.classList.toggle("hidden", lobbyMode !== "idle");
+  ui.hostSetupPanel.classList.toggle("hidden", lobbyMode !== "host_setup");
+  ui.joinSetupPanel.classList.toggle("hidden", lobbyMode !== "join_setup");
+  ui.roomInfoPanel.classList.toggle("hidden", !inSession || !hasRoom);
+
+  // Lobby / game controls
   ui.hostBadge.classList.toggle("hidden", !isHost || !connected);
-  ui.copyRoom.classList.toggle("hidden", !connected || !hasRoom);
-  ui.leaveLobby.classList.toggle("hidden", !inSession);
   ui.startGame.classList.toggle("hidden", !inSession || !isHost || gameState.started);
   ui.rulesSection.classList.toggle("hidden", !inSession || !isHost || gameState.started);
 }
@@ -1621,6 +1630,20 @@ function showStatus(message, className = "") {
   ui.roomStatus.className = className;
 }
 
+function showHostSetup() {
+  const name = cleanName(ui.username.value);
+  if (!name) { showStatus("Pick a name first.", "warn"); return; }
+  saveUsername(name);
+  setLobbyMode("host_setup");
+}
+
+function showJoinSetup() {
+  const name = cleanName(ui.username.value);
+  if (!name) { showStatus("Pick a name first.", "warn"); return; }
+  saveUsername(name);
+  setLobbyMode("join_setup");
+}
+
 function hostStartLobby() {
   const name = cleanName(ui.username.value);
   if (!name) {
@@ -1690,7 +1713,7 @@ function hostStartLobby() {
     log(`Room ${roomCode} created.`);
     setLobbyMode("connected");
   }, (error) => {
-    setLobbyMode("idle");
+    setLobbyMode("host_setup");
     showStatus(`Peer error: ${error.message}`, "error");
     log(`Peer error: ${error.message}`, "error");
   });
@@ -1836,7 +1859,7 @@ function joinLobby() {
     peerId = assignedId;
     connectToHost(roomCode, name);
   }, (error) => {
-    setLobbyMode("idle");
+    setLobbyMode("join_setup");
     showStatus(`Peer error: ${error.message}`, "error");
     log(`Peer error: ${error.message}`, "error");
   });
@@ -1919,17 +1942,23 @@ function connectToHost(code, username, attempt = 0) {
       connectToHost(code, username, attempt + 1);
       return;
     }
-    setLobbyMode("idle");
-    showStatus(`Host connection error: ${error.message}`, "error");
+    setLobbyMode("join_setup");
+    showStatus(`Couldn't connect to room ${code}. Check the code and try again.`, "error");
     log(`Host connection error: ${error.message}`, "error");
   });
 
+  const MAX_RECONNECT_ATTEMPTS = 5;
   hostConnection.on("close", () => {
     clearTimeout(timeout);
-    if (!isHost) {
+    if (isHost) return;
+    if (attempt < MAX_RECONNECT_ATTEMPTS) {
+      showStatus("Connection dropped — reconnecting...", "warn");
+      log("Connection dropped, retrying...", "warn");
+      setTimeout(() => connectToHost(code, username, attempt + 1), 1500);
+    } else {
       showStatus("Lost connection to the room.", "warn");
-      log("Disconnected from host.", "warn");
-      leaveLobby();
+      log("Disconnected from host after retries.", "warn");
+      setLobbyMode("join_setup");
     }
   });
 }
@@ -2533,10 +2562,14 @@ function leaveLobby() {
   renderRows();
   renderHelperPanel();
   setLobbyMode("idle");
-  showStatus("No room open yet.", "ok");
+  showStatus("Enter a code and connect.", "ok");
 }
 
 function bindEvents() {
+  ui.showHostBtn.addEventListener("click", showHostSetup);
+  ui.showJoinBtn.addEventListener("click", showJoinSetup);
+  ui.hostBackBtn.addEventListener("click", () => setLobbyMode("idle"));
+  ui.joinBackBtn.addEventListener("click", () => setLobbyMode("idle"));
   ui.loadLibraryFilesBtn.addEventListener("click", handleLibraryUpload);
   ui.createLobby.addEventListener("click", hostStartLobby);
   ui.joinLobby.addEventListener("click", joinLobby);

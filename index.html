@@ -38,26 +38,31 @@
 
         <div class="mainArea">
           <section class="screenPanel" id="welcomeScreen">
-            <section class="panel introPanel">
-              <p class="eyebrow">Step 1</p>
-              <h2>Name and room</h2>
-              <p class="muted">Get in fast. Read the rules in the lobby before anyone locks in.</p>
+
+            <!-- Step 1: name + choice -->
+            <section class="panel" id="choicePanel">
+              <h2>Pixel Timeline</h2>
+              <p class="muted">Recognize the screenshot. Place it in time. Steal the win.</p>
+              <div class="row">
+                <label for="username">Your name</label>
+                <input id="username" type="text" maxlength="18" placeholder="Enter your name" autocomplete="off" />
+              </div>
+              <div class="choiceBtnRow">
+                <button id="showHostBtn" type="button" class="choiceBtn">Host a game</button>
+                <button id="showJoinBtn" type="button" class="choiceBtn choiceBtn--secondary">Join a game</button>
+              </div>
             </section>
 
-            <section class="panel" id="settingsPanel">
-              <h2>Player setup</h2>
-              <div class="stepFlow">
-                <div class="stepChip is-current">1. Your name</div>
-                <div class="stepChip">2. Create or join room</div>
-                <div class="stepChip">3. Lobby and ready</div>
+            <!-- Host setup -->
+            <section class="panel hidden" id="hostSetupPanel">
+              <div class="panelBackRow">
+                <button id="hostBackBtn" type="button" class="backBtn">← Back</button>
+                <h2>Host a game</h2>
               </div>
-              <div class="row">
-                <label for="username">Username</label>
-                <input id="username" type="text" maxlength="18" placeholder="Your name" autocomplete="off" />
-              </div>
+              <p class="muted">A room code will be generated for you to share.</p>
               <div class="uploadPanel" id="uploadPanel">
-                <h3>Custom library <span class="eyebrow">Host only</span></h3>
-                <p class="muted">Upload a custom `games.json` (and optional `game-images.json`) before creating a room. Clients automatically receive the host's library on join.</p>
+                <h3>Custom library <span class="eyebrow">Optional</span></h3>
+                <p class="muted">Leave blank to use the default library. Clients receive the host's library automatically on join.</p>
                 <div class="row">
                   <label for="gameLibraryFile">Upload games.json</label>
                   <input id="gameLibraryFile" type="file" accept="application/json,.json" />
@@ -71,28 +76,41 @@
                 </div>
               </div>
               <p id="libraryStatus" class="muted">Checking library...</p>
-            </section>
-
-            <section class="panel" id="lobbySection">
-              <h2>Jump in</h2>
-              <p id="status">No room open yet.</p>
               <div class="row">
-                <button id="createLobby">Create lobby</button>
-                <button id="joinLobby">Join lobby</button>
-              </div>
-              <div class="row">
-                <label for="roomCode">Room code</label>
-                <input id="roomCode" maxlength="6" placeholder="Enter 6-char code" />
-              </div>
-              <div id="roomInfo" class="hidden roomMetaRow">
-                <span>Room code: <strong id="roomCodeLabel"></strong></span>
-                <div class="row">
-                  <button id="copyRoom">Copy</button>
-                  <button id="leaveLobby">Disconnect</button>
-                </div>
+                <button id="createLobby" type="button">Open room</button>
               </div>
               <p id="hostBadge" class="muted hidden">You're running the room.</p>
             </section>
+
+            <!-- Join setup -->
+            <section class="panel hidden" id="joinSetupPanel">
+              <div class="panelBackRow">
+                <button id="joinBackBtn" type="button" class="backBtn">← Back</button>
+                <h2>Join a game</h2>
+              </div>
+              <p class="muted">Enter the 6-character room code from the host.</p>
+              <div class="row">
+                <label for="roomCode">Room code</label>
+                <input id="roomCode" maxlength="6" placeholder="e.g. ABC123" autocomplete="off" style="text-transform:uppercase" />
+              </div>
+              <div class="row">
+                <button id="joinLobby" type="button">Connect</button>
+              </div>
+              <p id="status" class="muted">Enter a code and connect.</p>
+            </section>
+
+            <!-- In-room info (shown once connected, host or client) -->
+            <section class="panel hidden" id="roomInfoPanel">
+              <h2>Connected</h2>
+              <div id="roomInfo" class="roomMetaRow">
+                <span>Room: <strong id="roomCodeLabel"></strong></span>
+                <div class="row">
+                  <button id="copyRoom">Copy code</button>
+                  <button id="leaveLobby">Leave</button>
+                </div>
+              </div>
+            </section>
+
           </section>
 
           <section class="screenPanel hidden" id="lobbyScreen">
