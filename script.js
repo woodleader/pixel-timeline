@@ -155,6 +155,7 @@ const ui = {
   gameLibraryFile: $("gameLibraryFile"),
   gameImageLibraryFile: $("gameImageLibraryFile"),
   uploadPanel: $("uploadPanel"),
+  connDiag: $("connDiag"),
   loadLibraryFilesBtn: $("loadLibraryFilesBtn"),
   matchStatusSection: $("matchStatusSection"),
   matchPhaseSummary: $("matchPhaseSummary"),
@@ -1876,6 +1877,16 @@ function joinLobby() {
   });
 }
 
+function setConnDiag(message, kind = "") {
+  if (!ui.connDiag) return;
+  if (!message) {
+    ui.connDiag.classList.add("hidden");
+    return;
+  }
+  ui.connDiag.textContent = message;
+  ui.connDiag.className = `connDiag ${kind ? `is-${kind}` : ""}`.trim();
+}
+
 function monitorIceConnection(conn, myGen) {
   const pc = conn?.peerConnection;
   if (!pc) {
@@ -1883,16 +1894,19 @@ function monitorIceConnection(conn, myGen) {
     return;
   }
   log(`ICE state: ${pc.iceConnectionState} (initial).`);
+  setConnDiag(`ICE: ${pc.iceConnectionState}`, "warn");
   const onChange = () => {
     if (clientConnectionGen !== myGen) return;
     const state = pc.iceConnectionState;
     log(`ICE state changed: ${state}.`, state === "failed" || state === "disconnected" ? "warn" : "ok");
     if (state === "connected" || state === "completed") {
-      showStatus(`In room ${roomCode}.`, "ok");
+      setConnDiag(`Connected (ICE: ${state})`, "ok");
     } else if (state === "failed") {
-      showStatus("Network blocked the direct connection (ICE failed). A relay is required.", "error");
+      setConnDiag("ICE FAILED — network blocked direct connection, relay required", "error");
     } else if (state === "disconnected") {
-      showStatus("Connection unstable — trying to recover...", "warn");
+      setConnDiag("ICE disconnected — recovering...", "warn");
+    } else {
+      setConnDiag(`ICE: ${state}`, "warn");
     }
   };
   pc.addEventListener("iceconnectionstatechange", onChange);
@@ -1912,6 +1926,7 @@ function connectToHost(code, username, attempt = 0) {
     hostConnection = null;
   }
   setLobbyMode("connecting");
+  setConnDiag(`Connecting to ${code}... (attempt ${attempt + 1})`, "warn");
   hostConnection = peer.connect(code, {
     reliable: true,
     serialization: "json",
@@ -1990,6 +2005,7 @@ function connectToHost(code, username, attempt = 0) {
     if (isHost) return;
     if (attempt < MAX_RECONNECT_ATTEMPTS) {
       log("Connection dropped, retrying...", "warn");
+      setConnDiag(`Connection dropped — reconnecting (attempt ${attempt + 2})...`, "warn");
       setTimeout(() => {
         if (clientConnectionGen !== myGen) return;
         if (!peer || !peer.open) {
@@ -2003,6 +2019,7 @@ function connectToHost(code, username, attempt = 0) {
       }, 1500);
     } else {
       showStatus("Lost connection to the room.", "warn");
+      setConnDiag("Lost connection after retries — direct P2P likely blocked, relay required", "error");
       log("Disconnected from host after retries.", "warn");
       setLobbyMode("join_setup");
     }
@@ -2608,6 +2625,7 @@ function leaveLobby() {
   renderRows();
   renderHelperPanel();
   setLobbyMode("idle");
+  setConnDiag("");
   showStatus("Enter a code and connect.", "ok");
 }
 

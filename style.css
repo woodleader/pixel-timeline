@@ -856,6 +856,23 @@ details > summary::-webkit-details-marker { display: none; }
 
 .logPanel { background: rgba(14, 10, 4, 0.70); }
 
+.connDiag {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  color: #fff;
+  background: #444;
+}
+.connDiag.is-ok { background: #1f7a3d; }
+.connDiag.is-warn { background: #9a6a00; }
+.connDiag.is-error { background: #9a2222; }
+
 .debugToggle {
   background: transparent;
   border: none;
