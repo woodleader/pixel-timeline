@@ -1706,6 +1706,11 @@ function hostStartLobby() {
 
     peer.on("connection", (conn) => {
       conn.on("open", () => {
+        // A newer connection from the same peer supersedes any older one.
+        const existing = hostConnections[conn.peer];
+        if (existing && existing !== conn) {
+          try { existing.close(); } catch { /* ignore */ }
+        }
         hostConnections[conn.peer] = conn;
       });
       conn.on("data", (payload) => {
@@ -1713,10 +1718,12 @@ function hostStartLobby() {
         handleHostPayload(conn, payload);
       });
       conn.on("close", () => {
-        handleHostDisconnect(conn.peer);
+        // Ignore a stale/zombie connection's close — only the currently
+        // registered connection for this peer should trigger a disconnect.
+        if (hostConnections[conn.peer] === conn) handleHostDisconnect(conn.peer);
       });
       conn.on("error", () => {
-        handleHostDisconnect(conn.peer);
+        if (hostConnections[conn.peer] === conn) handleHostDisconnect(conn.peer);
       });
     });
 
@@ -1893,8 +1900,13 @@ function monitorIceConnection(conn, myGen) {
     log("No RTCPeerConnection available to monitor.", "warn");
     return;
   }
-  log(`ICE state: ${pc.iceConnectionState} (initial).`);
-  setConnDiag(`ICE: ${pc.iceConnectionState}`, "warn");
+  const initial = pc.iceConnectionState;
+  log(`ICE state: ${initial} (initial).`);
+  if (initial === "connected" || initial === "completed") {
+    setConnDiag(`Connected (ICE: ${initial})`, "ok");
+  } else {
+    setConnDiag(`ICE: ${initial}`, "warn");
+  }
   const onChange = () => {
     if (clientConnectionGen !== myGen) return;
     const state = pc.iceConnectionState;
@@ -1943,7 +1955,8 @@ function connectToHost(code, username, attempt = 0) {
     }
     setLobbyMode("join_setup");
     showStatus("Couldn't connect. Check the room code and try again.", "error");
-  }, 6000);
+    setConnDiag("Connection timed out — check the room code and try again.", "error");
+  }, 15000);
 
   hostConnection.on("open", () => {
     if (clientConnectionGen !== myGen || settled) return;
