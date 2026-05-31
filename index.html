@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pixel Timeline</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script src="script.js" defer></script>
@@ -12,37 +15,16 @@
     <main class="page">
       <header class="hero">
         <h1>Pixel Timeline</h1>
-        <p>Build your timeline of video game releases with live WebRTC lobbies.</p>
-        <p><a href="library-tool.html">Library tool</a></p>
+        <p>Recognize the screenshot. Place it in time. Steal the win.</p>
       </header>
 
       <div class="layout">
-        <aside class="sidebar">
-          <section class="panel" id="settingsPanel">
-            <h2>Settings</h2>
-            <div class="row">
-              <label for="username">Username</label>
-              <input id="username" type="text" maxlength="18" placeholder="Your name" autocomplete="off" />
-            </div>
-          </section>
-
-          <section class="panel" id="lobbySection">
-            <h2>Lobby</h2>
-            <p id="status">No active lobby.</p>
-            <div class="row">
-              <button id="createLobby">Create lobby</button>
-              <button id="joinLobby">Join lobby</button>
-            </div>
-            <div class="row">
-              <label for="roomCode">Room code</label>
-              <input id="roomCode" maxlength="6" placeholder="Enter 6-char code" />
-            </div>
-            <div id="roomInfo" class="hidden row">
-              <span>Room code: <strong id="roomCodeLabel"></strong></span>
-              <button id="copyRoom">Copy</button>
-              <button id="leaveLobby">Disconnect</button>
-            </div>
-            <p id="hostBadge" class="muted hidden">You are the host.</p>
+        <aside class="sidebar" id="sidebarShell">
+          <section class="panel hidden" id="matchStatusSection">
+            <h2>Match status</h2>
+            <p id="matchPhaseSummary" class="muted">No active match.</p>
+            <p id="matchRuleSummary" class="muted">Rules summary unavailable.</p>
+            <p id="matchStatusSummary" class="muted">Waiting for lobby.</p>
           </section>
 
           <section class="panel" id="currentPlayerSection">
@@ -55,84 +37,334 @@
         </aside>
 
         <div class="mainArea">
-          <section class="panel">
-            <h2>Lobby actions</h2>
-            <div class="row">
-              <button id="startGame" disabled>Start game</button>
-            </div>
+          <section class="screenPanel" id="welcomeScreen">
+            <section class="panel introPanel">
+              <p class="eyebrow">Step 1</p>
+              <h2>Name and room</h2>
+              <p class="muted">Get in fast. Read the rules in the lobby before anyone locks in.</p>
+            </section>
+
+            <section class="panel" id="settingsPanel">
+              <h2>Player setup</h2>
+              <div class="stepFlow">
+                <div class="stepChip is-current">1. Your name</div>
+                <div class="stepChip">2. Create or join room</div>
+                <div class="stepChip">3. Lobby and ready</div>
+              </div>
+              <div class="row">
+                <label for="username">Username</label>
+                <input id="username" type="text" maxlength="18" placeholder="Your name" autocomplete="off" />
+              </div>
+              <div class="uploadPanel" id="uploadPanel">
+                <h3>Custom library <span class="eyebrow">Host only</span></h3>
+                <p class="muted">Upload a custom `games.json` (and optional `game-images.json`) before creating a room. Clients automatically receive the host's library on join.</p>
+                <div class="row">
+                  <label for="gameLibraryFile">Upload games.json</label>
+                  <input id="gameLibraryFile" type="file" accept="application/json,.json" />
+                </div>
+                <div class="row">
+                  <label for="gameImageLibraryFile">Upload game-images.json (optional)</label>
+                  <input id="gameImageLibraryFile" type="file" accept="application/json,.json" />
+                </div>
+                <div class="row">
+                  <button id="loadLibraryFilesBtn" type="button">Load uploaded library</button>
+                </div>
+              </div>
+              <p id="libraryStatus" class="muted">Checking library...</p>
+            </section>
+
+            <section class="panel" id="lobbySection">
+              <h2>Jump in</h2>
+              <p id="status">No room open yet.</p>
+              <div class="row">
+                <button id="createLobby">Create lobby</button>
+                <button id="joinLobby">Join lobby</button>
+              </div>
+              <div class="row">
+                <label for="roomCode">Room code</label>
+                <input id="roomCode" maxlength="6" placeholder="Enter 6-char code" />
+              </div>
+              <div id="roomInfo" class="hidden roomMetaRow">
+                <span>Room code: <strong id="roomCodeLabel"></strong></span>
+                <div class="row">
+                  <button id="copyRoom">Copy</button>
+                  <button id="leaveLobby">Disconnect</button>
+                </div>
+              </div>
+              <p id="hostBadge" class="muted hidden">You're running the room.</p>
+            </section>
+          </section>
+
+          <section class="screenPanel hidden" id="lobbyScreen">
+            <section class="panel introPanel">
+              <p class="eyebrow">Step 3</p>
+              <h2>Lobby and ready</h2>
+              <p class="muted">Read the rules, take the guide or skip it, then lock in when you're ready.</p>
+            </section>
+
+            <section class="panel lobbyPrimary">
+              <div class="lobbyPrimaryHeader">
+                <div>
+                  <h2>Room staging</h2>
+                  <p id="lobbyReadySummary" class="muted">Waiting for players.</p>
+                </div>
+                <button id="readyToggleBtn" type="button">Ready up</button>
+              </div>
+              <div class="guideDecisionRow">
+                <button id="openGuideBtn" type="button">How to play</button>
+                <button id="skipGuideBtn" type="button">Skip it</button>
+                <p id="guideStatus" class="muted">Read the guide or skip it — your call.</p>
+              </div>
+
+              <div class="guidePanel" id="guidePanel">
+                <div class="guideSlideHeader">
+                  <p class="eyebrow" id="guideStepLabel">Guide 1 / 3</p>
+                  <h3 id="guideTitle">Timeline placement</h3>
+                </div>
+                <div id="guideExample" class="guideExample"></div>
+                <p id="guideBody" class="muted"></p>
+                <div class="guideActions">
+                  <button id="guidePrevBtn" type="button">Back</button>
+                  <button id="guideNextBtn" type="button">Next</button>
+                  <button id="guideCompleteBtn" type="button">Got it</button>
+                </div>
+              </div>
+
+              <div class="summaryCard" id="matchSummaryCard">
+                <h3>Match summary</h3>
+                <p id="matchSummaryText" class="muted"></p>
+              </div>
+
+              <div class="summaryCard" id="lobbyPlayersCard">
+                <h3>Players and readiness</h3>
+                <div id="lobbyPlayersList" class="lobbyPlayersList"></div>
+                <p id="rulesChangedNotice" class="muted"></p>
+              </div>
+            </section>
+
+            <section class="panel hostSettingsPanel" id="rulesSection">
+              <h2>Match settings</h2>
+              <div class="settingsGroup">
+                <h3>Counter guess</h3>
+                <div class="row">
+                  <label for="guessTimerPresetInput">Counter timer</label>
+                  <select id="guessTimerPresetInput">
+                    <option value="short">Short (15s)</option>
+                    <option value="normal">Normal (25s)</option>
+                    <option value="long">Long (40s)</option>
+                  </select>
+                </div>
+                <div class="row">
+                  <label for="guessModeInput">Guess mode</label>
+                  <select id="guessModeInput">
+                    <option value="either">Title or studio</option>
+                    <option value="both">Title and studio</option>
+                  </select>
+                </div>
+                <p id="rulesHelp" class="muted">Title or studio allows ranked partial wins. Title and studio requires both.</p>
+              </div>
+              <div class="settingsGroup">
+                <h3>Victory</h3>
+                <div class="row">
+                  <label for="pointsToWinInput">Points to win</label>
+                  <input id="pointsToWinInput" type="number" min="1" max="25" value="10" />
+                </div>
+              </div>
+            </section>
+
+            <section class="panel" id="lobbyActionPanel">
+              <h2>Ready to go</h2>
+              <div class="row">
+                <button id="startGame" disabled>Launch match</button>
+              </div>
+            </section>
           </section>
 
           <section id="gameSection" class="panel hidden">
-            <h2>Live game</h2>
-            <div class="grid">
+            <div class="turnCenterHeader">
               <div>
+                <p class="eyebrow">Turn center</p>
+                <h2>Live game</h2>
+              </div>
+              <div class="turnCenterMeta">
+                <p id="phaseInfo" class="muted"></p>
                 <p id="turnInfo" class="muted"></p>
                 <p id="deckInfo" class="muted"></p>
               </div>
-              <p id="roundMessage" class="muted"></p>
             </div>
 
-            <div id="promptCardWrap" class="prompt hidden">
-              <h3>Active screenshot</h3>
+            <section class="counterBanner hidden" id="counterBanner">
+              <div class="counterBannerMain">
+                <div>
+                  <p class="eyebrow">Counter phase</p>
+                  <h3 id="counterBannerTitle">Rivals are in play</h3>
+                  <p id="counterBannerText" class="muted"></p>
+                </div>
+                <div class="counterTimerWrap">
+                  <div id="countdownInfo" class="countdownLarge">25s</div>
+                  <div class="countdownTrack">
+                    <div id="countdownBar" class="countdownBar"></div>
+                  </div>
+                </div>
+              </div>
+              <div id="counterActionStates" class="counterActionStates"></div>
+            </section>
+
+            <section class="pauseBanner hidden" id="pauseBanner">
+              <div>
+                <h3 id="pauseTitle">Round paused</h3>
+                <p id="pauseText" class="muted"></p>
+              </div>
+              <div id="pauseCountdown" class="countdownLarge">20s</div>
+            </section>
+
+            <section class="helperPanel" id="firstMatchHelper">
+              <h3 id="helperTitle">Round tip</h3>
+              <p id="helperBody" class="muted"></p>
+              <button id="reopenGuideBtn" type="button">Open guide</button>
+            </section>
+
+            <div id="promptCardWrap" class="prompt">
+              <div class="promptHeader">
+                <div>
+                  <h3 id="promptTitle">Active screenshot</h3>
+                  <p id="promptMeta" class="muted"></p>
+                </div>
+                <div id="localCountdown" class="localCountdown hidden">25s</div>
+              </div>
               <img id="promptImage" alt="Current screenshot to guess" />
-              <div id="promptMeta" class="muted"></div>
             </div>
 
-            <div class="guessArea panel">
-              <h3>Your move</h3>
+            <section class="resultsView hidden" id="resultsView">
+              <div class="resultsTopRow">
+                <div class="resultsHero">
+                  <p class="eyebrow">Round results</p>
+                  <h3 id="resultsHeadline">Round settled</h3>
+                  <img id="resultsImage" alt="Revealed card" />
+                  <p id="resultsCardMeta" class="muted"></p>
+                </div>
+                <div class="resultsTimelineCard">
+                  <h4>Correct slot</h4>
+                  <div id="resultsTimelineSlice" class="timelineSlice"></div>
+                </div>
+              </div>
+              <div class="resultsBody">
+                <div class="resultsNarrative">
+                  <div class="resultStoryBlock">
+                    <h4>Active player</h4>
+                    <p id="resultsPlacementSummary" class="muted"></p>
+                  </div>
+                  <div class="resultStoryBlock">
+                    <h4>Guess outcome</h4>
+                    <p id="resultsGuessSummary" class="muted"></p>
+                  </div>
+                  <div class="resultStoryBlock">
+                    <h4>Counter actions</h4>
+                    <p id="resultsCounterSummary" class="muted"></p>
+                  </div>
+                  <div class="resultStoryBlock">
+                    <h4>How it happened</h4>
+                    <p id="resultsReplaySummary" class="muted"></p>
+                  </div>
+                </div>
+                <div class="resultsPayout">
+                  <div class="resultsPayoutHeader">
+                    <h4>Round payout</h4>
+                    <p id="resultsRaceSummary" class="muted"></p>
+                  </div>
+                  <div id="resultsPayoutList" class="resultsPayoutList"></div>
+                  <details class="whyGuessPanel" id="whyGuessPanel">
+                    <summary>Why this guess won</summary>
+                    <div id="whyGuessSummary" class="muted"></div>
+                    <div id="whyGuessAll" class="muted"></div>
+                  </details>
+                  <div class="row">
+                    <button id="skipResultsBtn" type="button">Next round</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div class="guessArea panel" id="activeTurnPanel">
+              <h3>Make your call</h3>
               <div class="row">
                 <label for="positionSelect">Placement</label>
                 <select id="positionSelect"></select>
-                <button id="placeCardBtn" disabled>Place card</button>
+                <button id="placeCardBtn" disabled>Drop it here</button>
               </div>
-              <div class="row">
-                <label for="guessTitleInput">Guess title</label>
-                <input
-                  id="guessTitleInput"
-                  type="text"
-                  list="titleSuggestions"
-                  placeholder="title (bonus reward)"
-                  autocomplete="off"
-                />
-                <datalist id="titleSuggestions"></datalist>
+              <div class="row" id="guessTitleRow">
+                <label for="guessTitleInput" id="guessTitleLabel">Guess title</label>
+                <input id="guessTitleInput" type="text" list="titleSuggestions" placeholder="title" autocomplete="off" />
               </div>
-              <div class="row">
-                <label for="guessStudioInput">Guess studio</label>
-                <input
-                  id="guessStudioInput"
-                  type="text"
-                  list="studioSuggestions"
-                  placeholder="studio (bonus reward)"
-                  autocomplete="off"
-                />
-                <datalist id="studioSuggestions"></datalist>
+              <div class="row" id="guessStudioRow">
+                <label for="guessStudioInput" id="guessStudioLabel">Guess studio</label>
+                <input id="guessStudioInput" type="text" list="studioSuggestions" placeholder="studio" autocomplete="off" />
               </div>
               <p id="guessStatus" class="muted"></p>
+
+              <div class="panel subPanel" id="turnActionPanel">
+                <h3>Spend a token</h3>
+                <div class="row">
+                  <button id="rerollBtn">GLITCH it out (-1 token)</button>
+                  <button id="autoPlaceBtn">Time Warp — skip it (-3 tokens)</button>
+                </div>
+                <p class="muted" id="placementHint">Spend tokens now, or drop the card and guess.</p>
+              </div>
             </div>
 
-            <div class="panel">
-              <h3>Token actions (active player)</h3>
-              <div class="row">
-                <button id="rerollBtn">GLITCH-Roll (-1 token)</button>
-                <button id="autoPlaceBtn">Auto-place next card (-3 tokens)</button>
+            <div id="opponentGuessPanel" class="guessArea panel hidden">
+              <h3>Their turn to hunt</h3>
+              <div class="panel subPanel counterActionCard" id="counterPlacementCard">
+                <div class="counterActionCardHeader">
+                  <div>
+                    <h3>Steal this gap</h3>
+                    <p class="muted">Spend 1 token. If the active player misses and you called the right gap, the card is yours.</p>
+                  </div>
+                  <span id="placementActionState" class="statusChip">Open</span>
+                </div>
+                <div class="row">
+                  <label for="opponentPlacementSelect">Open slot</label>
+                  <select id="opponentPlacementSelect"></select>
+                  <button id="opponentPlacementBtn">Steal this gap</button>
+                </div>
+                <p class="muted" id="opponentPlacementHint"></p>
               </div>
-              <p class="muted" id="placementHint">On your turn: spend tokens, place the card by choosing its position.</p>
+
+              <div class="panel subPanel counterActionCard" id="counterGuessCard">
+                <div class="counterActionCardHeader">
+                  <div>
+                    <h3>Seal a secret bid</h3>
+                    <p id="counterGuessRiskText" class="muted">Spend 1 token. If your bid wins, you get it back plus one extra.</p>
+                  </div>
+                  <span id="guessActionState" class="statusChip">Open</span>
+                </div>
+                <div class="row">
+                  <label for="opponentGuessTitleInput" id="opponentGuessTitleLabel">Your title guess</label>
+                  <input id="opponentGuessTitleInput" type="text" list="titleSuggestions" placeholder="title" autocomplete="off" />
+                </div>
+                <div class="row" id="opponentGuessStudioRow">
+                  <label for="opponentGuessStudioInput" id="opponentGuessStudioLabel">Your studio guess</label>
+                  <input id="opponentGuessStudioInput" type="text" list="studioSuggestions" placeholder="studio" autocomplete="off" />
+                </div>
+                <div class="row">
+                  <button id="opponentGuessBtn">Seal my bid</button>
+                </div>
+                <p class="muted" id="opponentGuessHint"></p>
+              </div>
             </div>
 
-            <div id="challengeWrap" class="panel hidden">
-              <h3>GLITCH! on opponent turn</h3>
-              <div class="row">
-                <label for="glitchPosition">Your position guess</label>
-                <select id="glitchPosition"></select>
-                <button id="glitchBtn" disabled>Shout GLITCH! (-1 token)</button>
-              </div>
-              <p class="muted" id="challengeHint">During another player's turn, guess where they think this card belongs.</p>
+            <div id="waitingPanel" class="panel hidden">
+              <h3>Sit tight</h3>
+              <p id="waitingHint" class="muted">Not your turn. Eyes on the board.</p>
             </div>
 
             <section>
               <h3>Rows</h3>
               <div id="rowsArea"></div>
             </section>
+
+            <datalist id="titleSuggestions"></datalist>
+            <datalist id="studioSuggestions"></datalist>
           </section>
 
           <details class="panel logPanel">
@@ -141,6 +373,10 @@
               <div id="log"></div>
             </div>
           </details>
+
+          <footer class="pageFooter">
+            <a href="library-tool.html" class="footerLink">Library tool</a>
+          </footer>
         </div>
       </div>
     </main>
