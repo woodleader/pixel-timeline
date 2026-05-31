@@ -1793,6 +1793,16 @@ function handleHostPayload(conn, payload) {
   }
 }
 
+function hostSendLibraryLater(conn) {
+  // Defer the large library payload so it can't choke the data channel
+  // before the small, critical lobby-state has been delivered.
+  setTimeout(() => {
+    if (hostConnections[conn.peer] === conn && conn.open) {
+      conn.send({ type: "library-sync", cards: librarySyncCards() });
+    }
+  }, 800);
+}
+
 function handleHostJoinRequest(conn, payload) {
   const existing = hostFindPlayerBySession(payload.sessionId);
   if (existing) {
@@ -1801,7 +1811,6 @@ function handleHostJoinRequest(conn, payload) {
     existing.name = hostBuildUniqueName(payload.username || existing.name, existing.id);
     hostUpdateGuideState(existing, payload);
     conn.send({ type: "system", message: `Welcome back, ${existing.name}. You're in.`, kind: "ok" });
-    conn.send({ type: "library-sync", cards: librarySyncCards() });
     if (hostState.phase === "paused" && hostState.pausedState?.playerId === existing.id) {
       clearTimeout(hostPauseTimer);
       hostPauseTimer = null;
@@ -1810,6 +1819,7 @@ function handleHostJoinRequest(conn, payload) {
       hostState.roundMessage = `${existing.name} is back. Turn resumes.`;
     }
     hostBroadcastState(hostState.revealCurrent);
+    hostSendLibraryLater(conn);
     return;
   }
 
@@ -1825,9 +1835,9 @@ function handleHostJoinRequest(conn, payload) {
 
   const player = hostAddPlayer(payload, conn.peer);
   conn.send({ type: "system", message: `You're in, ${player.name}. Get ready.`, kind: "ok" });
-  conn.send({ type: "library-sync", cards: librarySyncCards() });
   hostSystem(`${player.name} joined the room.`, "ok");
   hostBroadcastState();
+  hostSendLibraryLater(conn);
 }
 
 function handleHostDisconnect(peerKey) {
@@ -1908,26 +1918,14 @@ function monitorIceConnection(conn, myGen) {
     log("No RTCPeerConnection available to monitor.", "warn");
     return;
   }
-  const initial = pc.iceConnectionState;
-  log(`ICE state: ${initial} (initial).`);
-  if (initial === "connected" || initial === "completed") {
-    setConnDiag(`Connected (ICE: ${initial})`, "ok");
-  } else {
-    setConnDiag(`ICE: ${initial}`, "warn");
-  }
+  // Log ICE state to the debug log only — the banner is reserved for the
+  // message trace so we can see the host->client flow.
+  log(`ICE state: ${pc.iceConnectionState} (initial).`);
   const onChange = () => {
     if (clientConnectionGen !== myGen) return;
     const state = pc.iceConnectionState;
     log(`ICE state changed: ${state}.`, state === "failed" || state === "disconnected" ? "warn" : "ok");
-    if (state === "connected" || state === "completed") {
-      setConnDiag(`Connected (ICE: ${state})`, "ok");
-    } else if (state === "failed") {
-      setConnDiag("ICE FAILED — network blocked direct connection, relay required", "error");
-    } else if (state === "disconnected") {
-      setConnDiag("ICE disconnected — recovering...", "warn");
-    } else {
-      setConnDiag(`ICE: ${state}`, "warn");
-    }
+    if (state === "failed") connTraceEvent("ICE-FAILED", "error");
   };
   pc.addEventListener("iceconnectionstatechange", onChange);
 }
