@@ -600,6 +600,13 @@ function hydrateSyncedState(state = {}) {
   };
 }
 
+function librarySyncCards() {
+  return GAME_CARDS.map(({ id, title, studio, year, imageId, image }) => ({
+    id, title, studio, year, imageId,
+    image: image && !image.startsWith("data:") ? image : ""
+  }));
+}
+
 function syncCardForPeer(card = {}) {
   if (!card || typeof card !== "object") return card;
   return { ...card, image: "" };
@@ -1785,7 +1792,7 @@ function handleHostJoinRequest(conn, payload) {
     existing.name = hostBuildUniqueName(payload.username || existing.name, existing.id);
     hostUpdateGuideState(existing, payload);
     conn.send({ type: "system", message: `Welcome back, ${existing.name}. You're in.`, kind: "ok" });
-    conn.send({ type: "library-sync", cards: GAME_CARDS });
+    conn.send({ type: "library-sync", cards: librarySyncCards() });
     if (hostState.phase === "paused" && hostState.pausedState?.playerId === existing.id) {
       clearTimeout(hostPauseTimer);
       hostPauseTimer = null;
@@ -1809,7 +1816,7 @@ function handleHostJoinRequest(conn, payload) {
 
   const player = hostAddPlayer(payload, conn.peer);
   conn.send({ type: "system", message: `You're in, ${player.name}. Get ready.`, kind: "ok" });
-  conn.send({ type: "library-sync", cards: GAME_CARDS });
+  conn.send({ type: "library-sync", cards: librarySyncCards() });
   hostSystem(`${player.name} joined the room.`, "ok");
   hostBroadcastState();
 }
