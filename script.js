@@ -1915,17 +1915,19 @@ function connectToHost(code, username, attempt = 0) {
     setLobbyMode("connected");
     renderMainSections();
     ui.roomCodeLabel.textContent = code;
-    showStatus(`Joining ${code}...`, "ok");
+    showStatus(`[1/3] Channel open — sending join request...`, "ok");
     log(`Connected to ${code}.`);
   });
 
   hostConnection.on("data", (message) => {
     if (!message || !message.type) return;
     if (message.type === "lobby-state") {
+      showStatus(`[3/3] Room state received — entering lobby.`, "ok");
       applyState(message.state, message.myPlayerId);
       return;
     }
     if (message.type === "library-sync") {
+      showStatus(`[2/3] Library received (${message.cards?.length ?? 0} cards) — waiting for room state...`, "ok");
       if (Array.isArray(message.cards) && message.cards.length) {
         GAME_CARDS = message.cards;
         reindexGameCards();
@@ -1936,7 +1938,7 @@ function connectToHost(code, username, attempt = 0) {
       return;
     }
     if (message.type === "system") {
-      showStatus(message.message, message.kind || "ok");
+      showStatus(`[1/3] ${message.message}`, message.kind || "ok");
       log(message.message, message.kind || "ok");
       return;
     }
