@@ -96,6 +96,7 @@ let hostGuessWindowTimer = null;
 let hostResultsTimer = null;
 let hostPauseTimer = null;
 let clientCountdownTimer = null;
+let clientConnectionGen = 0;
 let phaseEntryKey = "";
 let suggestionTitles = [];
 let suggestionStudios = [];
@@ -1877,17 +1878,16 @@ function joinLobby() {
 
 function connectToHost(code, username, attempt = 0) {
   const maxAttempts = 3;
+  const myGen = ++clientConnectionGen;
+
   if (!peer || !peer.open) {
     showStatus("Peer service not ready. Try again.", "error");
     setLobbyMode("idle");
     return;
   }
   if (hostConnection) {
-    try {
-      hostConnection.close();
-    } catch {
-      // ignore
-    }
+    try { hostConnection.close(); } catch { /* ignore */ }
+    hostConnection = null;
   }
   setLobbyMode("connecting");
   hostConnection = peer.connect(code, {
@@ -1897,37 +1897,37 @@ function connectToHost(code, username, attempt = 0) {
   });
   let settled = false;
   const timeout = setTimeout(() => {
+    if (clientConnectionGen !== myGen) return;
     if (settled) return;
     settled = true;
     if (attempt + 1 < maxAttempts) {
       connectToHost(code, username, attempt + 1);
       return;
     }
-    setLobbyMode("idle");
-    showStatus("Couldn't connect. Try a different network.", "error");
+    setLobbyMode("join_setup");
+    showStatus("Couldn't connect. Check the room code and try again.", "error");
   }, 6000);
 
   hostConnection.on("open", () => {
-    if (settled) return;
+    if (clientConnectionGen !== myGen || settled) return;
     settled = true;
     clearTimeout(timeout);
     hostConnection.send(buildJoinPayload(username));
     setLobbyMode("connected");
     renderMainSections();
     ui.roomCodeLabel.textContent = code;
-    showStatus(`[1/3] Channel open — sending join request...`, "ok");
+    showStatus(`Connecting to ${code}...`, "ok");
     log(`Connected to ${code}.`);
   });
 
   hostConnection.on("data", (message) => {
+    if (clientConnectionGen !== myGen) return;
     if (!message || !message.type) return;
     if (message.type === "lobby-state") {
-      showStatus(`[3/3] Room state received — entering lobby.`, "ok");
       applyState(message.state, message.myPlayerId);
       return;
     }
     if (message.type === "library-sync") {
-      showStatus(`[2/3] Library received (${message.cards?.length ?? 0} cards) — waiting for room state...`, "ok");
       if (Array.isArray(message.cards) && message.cards.length) {
         GAME_CARDS = message.cards;
         reindexGameCards();
@@ -1938,7 +1938,7 @@ function connectToHost(code, username, attempt = 0) {
       return;
     }
     if (message.type === "system") {
-      showStatus(`[1/3] ${message.message}`, message.kind || "ok");
+      showStatus(message.message, message.kind || "ok");
       log(message.message, message.kind || "ok");
       return;
     }
@@ -1949,6 +1949,7 @@ function connectToHost(code, username, attempt = 0) {
   });
 
   hostConnection.on("error", (error) => {
+    if (clientConnectionGen !== myGen) return;
     clearTimeout(timeout);
     if (attempt + 1 < maxAttempts) {
       connectToHost(code, username, attempt + 1);
@@ -1961,12 +1962,13 @@ function connectToHost(code, username, attempt = 0) {
 
   const MAX_RECONNECT_ATTEMPTS = 5;
   hostConnection.on("close", () => {
+    if (clientConnectionGen !== myGen) return;
     clearTimeout(timeout);
     if (isHost) return;
     if (attempt < MAX_RECONNECT_ATTEMPTS) {
-      showStatus("Connection dropped — reconnecting...", "warn");
       log("Connection dropped, retrying...", "warn");
       setTimeout(() => {
+        if (clientConnectionGen !== myGen) return;
         if (!peer || !peer.open) {
           openPeer(null, (assignedId) => {
             peerId = assignedId;
