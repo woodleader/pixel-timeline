@@ -1884,6 +1884,8 @@ function joinLobby() {
   });
 }
 
+let connTrace = [];
+
 function setConnDiag(message, kind = "") {
   if (!ui.connDiag) return;
   if (!message) {
@@ -1892,6 +1894,12 @@ function setConnDiag(message, kind = "") {
   }
   ui.connDiag.textContent = message;
   ui.connDiag.className = `connDiag ${kind ? `is-${kind}` : ""}`.trim();
+}
+
+function connTraceEvent(event, kind = "warn") {
+  connTrace.push(event);
+  if (connTrace.length > 8) connTrace = connTrace.slice(-8);
+  setConnDiag(connTrace.join(" → "), kind);
 }
 
 function monitorIceConnection(conn, myGen) {
@@ -1938,7 +1946,7 @@ function connectToHost(code, username, attempt = 0) {
     hostConnection = null;
   }
   setLobbyMode("connecting");
-  setConnDiag(`Connecting to ${code}... (attempt ${attempt + 1})`, "warn");
+  connTraceEvent(`try#${attempt + 1}`);
   hostConnection = peer.connect(code, {
     reliable: true,
     serialization: "json",
@@ -1968,12 +1976,14 @@ function connectToHost(code, username, attempt = 0) {
     ui.roomCodeLabel.textContent = code;
     showStatus(`Connecting to ${code}...`, "ok");
     log(`Connected to ${code}.`);
+    connTraceEvent("open;join-sent");
     monitorIceConnection(hostConnection, myGen);
   });
 
   hostConnection.on("data", (message) => {
     if (clientConnectionGen !== myGen) return;
     if (!message || !message.type) return;
+    connTraceEvent(`rx:${message.type}`, message.type === "lobby-state" ? "ok" : "warn");
     if (message.type === "lobby-state") {
       applyState(message.state, message.myPlayerId);
       return;
@@ -2002,6 +2012,7 @@ function connectToHost(code, username, attempt = 0) {
   hostConnection.on("error", (error) => {
     if (clientConnectionGen !== myGen) return;
     clearTimeout(timeout);
+    connTraceEvent(`ERR:${error?.type || error?.message || "?"}`, "error");
     if (attempt + 1 < maxAttempts) {
       connectToHost(code, username, attempt + 1);
       return;
@@ -2015,10 +2026,10 @@ function connectToHost(code, username, attempt = 0) {
   hostConnection.on("close", () => {
     if (clientConnectionGen !== myGen) return;
     clearTimeout(timeout);
+    connTraceEvent("CLOSED", "error");
     if (isHost) return;
     if (attempt < MAX_RECONNECT_ATTEMPTS) {
       log("Connection dropped, retrying...", "warn");
-      setConnDiag(`Connection dropped — reconnecting (attempt ${attempt + 2})...`, "warn");
       setTimeout(() => {
         if (clientConnectionGen !== myGen) return;
         if (!peer || !peer.open) {
