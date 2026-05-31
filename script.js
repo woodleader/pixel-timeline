@@ -97,6 +97,8 @@ let hostResultsTimer = null;
 let hostPauseTimer = null;
 let clientCountdownTimer = null;
 let clientConnectionGen = 0;
+let clientHeartbeatTimer = null;
+let clientLastPongAt = 0;
 let phaseEntryKey = "";
 let suggestionTitles = [];
 let suggestionStudios = [];
@@ -1835,6 +1837,10 @@ function hostStartLobby() {
 }
 
 function handleHostPayload(conn, payload) {
+  if (payload.type === "ping") {
+    try { conn.send({ type: "pong", t: payload.t }); } catch { /* ignore */ }
+    return;
+  }
   if (payload.type === "join-request") {
     handleHostJoinRequest(conn, payload);
     return;
@@ -1903,6 +1909,9 @@ function handleHostJoinRequest(conn, payload) {
     existing.name = hostBuildUniqueName(payload.username || existing.name, existing.id);
     existing.libraryHash = payload.libraryHash || "";
     hostUpdateGuideState(existing, payload);
+    if (!hostState.started && hostState.rulesNotice === `${existing.name} dropped out.`) {
+      hostState.rulesNotice = "";
+    }
     conn.send({ type: "system", message: `Welcome back, ${existing.name}. You're in.`, kind: "ok" });
     if (hostState.phase === "paused" && hostState.pausedState?.playerId === existing.id) {
       clearTimeout(hostPauseTimer);
@@ -2022,6 +2031,36 @@ function monitorIceConnection(conn, myGen) {
   pc.addEventListener("iceconnectionstatechange", onChange);
 }
 
+function stopClientHeartbeat() {
+  if (clientHeartbeatTimer) {
+    clearInterval(clientHeartbeatTimer);
+    clientHeartbeatTimer = null;
+  }
+}
+
+function startClientHeartbeat(code, username, myGen) {
+  stopClientHeartbeat();
+  clientLastPongAt = Date.now();
+  clientHeartbeatTimer = setInterval(() => {
+    if (clientConnectionGen !== myGen || isHost) {
+      stopClientHeartbeat();
+      return;
+    }
+    // No reply for too long → the connection is silently dead (half-open). Reconnect.
+    if (Date.now() - clientLastPongAt > 12000) {
+      log("Heartbeat timeout — connection dead, reconnecting.", "warn");
+      setConnDiag("✕ Connection lost (no heartbeat) — reconnecting...", "error");
+      stopClientHeartbeat();
+      try { hostConnection && hostConnection.close(); } catch { /* ignore */ }
+      connectToHost(code, username, 0); // fresh gen supersedes the dead one
+      return;
+    }
+    if (hostConnection && hostConnection.open) {
+      try { hostConnection.send({ type: "ping", t: Date.now() }); } catch { /* ignore */ }
+    }
+  }, 4000);
+}
+
 function connectToHost(code, username, attempt = 0) {
   const maxAttempts = 3;
   const myGen = ++clientConnectionGen;
@@ -2068,14 +2107,17 @@ function connectToHost(code, username, attempt = 0) {
     log(`Connected to ${code}.`);
     connTraceEvent("open;join-sent");
     monitorIceConnection(hostConnection, myGen);
+    startClientHeartbeat(code, username, myGen);
   });
 
   hostConnection.on("data", (message) => {
     if (clientConnectionGen !== myGen) return;
     if (!message || !message.type) return;
+    clientLastPongAt = Date.now(); // any inbound traffic proves the link is alive
+    if (message.type === "pong") return;
     if (message.type === "lobby-state") {
-      setConnDiag(""); // healthy — clear the diagnostic banner
       connTrace = [];
+      setConnDiag("● Connected to host", "ok"); // persistent health indicator
       applyState(message.state, message.myPlayerId);
       return;
     }
@@ -2132,8 +2174,17 @@ function connectToHost(code, username, attempt = 0) {
 }
 
 function hostSendAction(type, payload = {}) {
-  if (!hostConnection || !hostConnection.open) return;
-  hostConnection.send({ type, ...payload });
+  if (!hostConnection || !hostConnection.open) {
+    setConnDiag("✕ Not connected — action didn't send. Reconnecting...", "error");
+    log(`Action "${type}" dropped: connection not open.`, "warn");
+    return;
+  }
+  try {
+    hostConnection.send({ type, ...payload });
+  } catch (error) {
+    setConnDiag(`✕ Send failed: ${error?.message || error}`, "error");
+    log(`Send "${type}" failed: ${error?.message || error}`, "error");
+  }
 }
 
 function hostUpdateRules(nextRules) {
@@ -2716,6 +2767,8 @@ function leaveLobby() {
   clearTimeout(hostResultsTimer);
   clearTimeout(hostPauseTimer);
   clearInterval(clientCountdownTimer);
+  stopClientHeartbeat();
+  clientConnectionGen += 1; // invalidate any in-flight reconnect handlers
   hostGuessWindowTimer = null;
   hostResultsTimer = null;
   hostPauseTimer = null;
