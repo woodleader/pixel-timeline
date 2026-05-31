@@ -200,6 +200,17 @@
                 <p id="rulesHelp" class="muted">Title or studio allows ranked partial wins. Title and studio requires both.</p>
               </div>
               <div class="settingsGroup">
+                <h3>Screenshot reveal</h3>
+                <div class="row">
+                  <label for="imageModeInput">Image mode</label>
+                  <select id="imageModeInput">
+                    <option value="full">Full screenshot</option>
+                    <option value="cutout">Cutout (small detail only)</option>
+                  </select>
+                </div>
+                <p class="muted">Cutout shows just a zoomed-in sliver of the screenshot until the reveal — much harder.</p>
+              </div>
+              <div class="settingsGroup">
                 <h3>Victory</h3>
                 <div class="row">
                   <label for="pointsToWinInput">Points to win</label>
@@ -268,7 +279,9 @@
                 </div>
                 <div id="localCountdown" class="localCountdown hidden">25s</div>
               </div>
-              <img id="promptImage" alt="Current screenshot to guess" />
+              <div id="promptImageFrame" class="promptImageFrame">
+                <img id="promptImage" alt="Current screenshot to guess" />
+              </div>
             </div>
 
             <section class="resultsView hidden" id="resultsView">

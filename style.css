@@ -624,6 +624,20 @@ details > summary::-webkit-details-marker { display: none; }
 
 .promptHeader { justify-content: space-between; align-items: flex-start; }
 
+/* Cutout reveal mode: show only a zoomed-in slice of the screenshot */
+.promptImageFrame.is-cutout {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 500px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background-color: #000;
+  background-repeat: no-repeat;
+  image-rendering: auto;
+  box-shadow: inset 0 0 0 2px rgba(122, 184, 196, 0.35);
+}
+.promptImageFrame.is-cutout img { display: none; }
+
 /* ─── Guess area ──────────────────────────────────────── */
 
 .guessArea, .resultsView { display: grid; gap: 16px; }

@@ -48,7 +48,8 @@ const DEFAULT_RULES = {
   pointsToWin: 10,
   guessTimerPreset: "normal",
   guessWindowSeconds: TIMER_PRESETS.normal.seconds,
-  guessMode: "either"
+  guessMode: "either",
+  imageMode: "full"
 };
 const USERNAME_STORAGE_KEY = "pixelTimelineUsername";
 const SESSION_STORAGE_KEY = "pixelTimelineSession";
@@ -177,6 +178,7 @@ const ui = {
   pointsToWinInput: $("pointsToWinInput"),
   guessTimerPresetInput: $("guessTimerPresetInput"),
   guessModeInput: $("guessModeInput"),
+  imageModeInput: $("imageModeInput"),
   rulesHelp: $("rulesHelp"),
   lobbyReadySummary: $("lobbyReadySummary"),
   readyToggleBtn: $("readyToggleBtn"),
@@ -214,6 +216,7 @@ const ui = {
   pauseCountdown: $("pauseCountdown"),
   promptWrap: $("promptCardWrap"),
   promptTitle: $("promptTitle"),
+  promptImageFrame: $("promptImageFrame"),
   promptImage: $("promptImage"),
   promptMeta: $("promptMeta"),
   localCountdown: $("localCountdown"),
@@ -454,18 +457,21 @@ function normalizeRules(raw = {}) {
   const preset = raw.guessTimerPreset && TIMER_PRESETS[raw.guessTimerPreset] ? raw.guessTimerPreset : DEFAULT_RULES.guessTimerPreset;
   const seconds = TIMER_PRESETS[preset].seconds;
   const guessMode = raw.guessMode === "both" ? "both" : "either";
+  const imageMode = raw.imageMode === "cutout" ? "cutout" : "full";
   return {
     pointsToWin: Number.isFinite(points) ? Math.max(1, Math.min(25, points)) : DEFAULT_RULES.pointsToWin,
     guessTimerPreset: preset,
     guessWindowSeconds: seconds,
-    guessMode
+    guessMode,
+    imageMode
   };
 }
 
 function ruleSummaryText(rules = DEFAULT_RULES) {
   const preset = TIMER_PRESETS[rules.guessTimerPreset] || TIMER_PRESETS.normal;
   const mode = rules.guessMode === "both" ? "Title and studio" : "Title or studio";
-  return `First to ${rules.pointsToWin} points • Counter timer ${preset.label} (${rules.guessWindowSeconds}s) • Guess mode ${mode}`;
+  const image = rules.imageMode === "cutout" ? "Cutout reveal" : "Full screenshot";
+  return `First to ${rules.pointsToWin} points • Counter timer ${preset.label} (${rules.guessWindowSeconds}s) • Guess mode ${mode} • ${image}`;
 }
 
 function presetLabel(presetKey) {
@@ -1052,6 +1058,7 @@ function updateRuleControls() {
   ui.pointsToWinInput.value = String(rules.pointsToWin);
   ui.guessTimerPresetInput.value = rules.guessTimerPreset;
   ui.guessModeInput.value = rules.guessMode;
+  if (ui.imageModeInput) ui.imageModeInput.value = rules.imageMode;
   ui.rulesHelp.textContent = rules.guessMode === "either"
     ? "Title or studio is enough. Ranking is both correct > title correct > studio correct. Active player wins exact ties."
     : "Title and studio requires both fields to be correct for any guess to win.";
@@ -1221,18 +1228,55 @@ function renderPauseBanner() {
   ui.pauseCountdown.textContent = `${getPauseRemainingSeconds()}s`;
 }
 
+function cutoutForCard(cardId) {
+  let hash = 2166136261;
+  const s = String(cardId || "");
+  for (let i = 0; i < s.length; i += 1) {
+    hash ^= s.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  // Two independent values in [15, 85] so the crop avoids the very edges,
+  // plus a zoom factor that varies a little per card.
+  const px = 15 + (hash % 71);
+  const py = 15 + ((hash >>> 8) % 71);
+  const zoom = 280 + ((hash >>> 16) % 120); // 280%–400%
+  return { px, py, zoom };
+}
+
+function applyPromptCutout(card, on) {
+  const frame = ui.promptImageFrame;
+  if (!frame) return;
+  if (on) {
+    const { px, py, zoom } = cutoutForCard(card.id);
+    frame.classList.add("is-cutout");
+    frame.style.backgroundImage = `url("${card.image}")`;
+    frame.style.backgroundSize = `${zoom}%`;
+    frame.style.backgroundPosition = `${px}% ${py}%`;
+  } else {
+    frame.classList.remove("is-cutout");
+    frame.style.backgroundImage = "";
+  }
+}
+
 function renderPrompt() {
   const card = gameState.currentCard;
   const show = Boolean(gameState.started && card);
   ui.promptWrap.classList.toggle("hidden", !show);
-  if (!show) return;
+  if (!show) {
+    applyPromptCutout(null, false);
+    return;
+  }
   const isReveal = Boolean(gameState.revealCurrent || gameState.phase === "resolution");
+  const cutout = (gameState.rules?.imageMode === "cutout") && !isReveal;
   ui.promptTitle.textContent = gameState.phase === "resolution" ? "Unmasked" : "Now Showing";
   ui.promptImage.src = card.image;
   ui.promptImage.alt = isReveal ? safeText(card.title, "Revealed card") : "Mystery screenshot";
+  applyPromptCutout(card, cutout);
   ui.promptMeta.textContent = isReveal
     ? `${card.title} — ${card.year} — ${card.studio}`
-    : "Screenshot locked in. Title, studio, and year drop when time's up.";
+    : cutout
+      ? "Just a sliver of the screenshot. Name the game from the detail before time's up."
+      : "Screenshot locked in. Title, studio, and year drop when time's up.";
 }
 
 function fillPositionOptions(selectEl, rowCards, reserved = new Set(), labelPrefix = "Place") {
@@ -2213,6 +2257,9 @@ function hostUpdateRules(nextRules) {
   if (before.guessMode !== next.guessMode) {
     changedLabel.push(`guess mode ${before.guessMode === "both" ? "Title and studio" : "Title or studio"} -> ${next.guessMode === "both" ? "Title and studio" : "Title or studio"}`);
   }
+  if (before.imageMode !== next.imageMode) {
+    changedLabel.push(`reveal ${before.imageMode === "cutout" ? "Cutout" : "Full"} -> ${next.imageMode === "cutout" ? "Cutout" : "Full"}`);
+  }
   hostResetReadyStates(changedLabel.length ? `Rules changed. Please ready again. ${changedLabel.join(" • ")}` : "Rules changed. Please ready again.");
   hostBroadcastState();
 }
@@ -2879,6 +2926,7 @@ function bindEvents() {
   ui.pointsToWinInput.addEventListener("input", () => hostUpdateRules({ pointsToWin: ui.pointsToWinInput.value }));
   ui.guessTimerPresetInput.addEventListener("change", () => hostUpdateRules({ guessTimerPreset: ui.guessTimerPresetInput.value }));
   ui.guessModeInput.addEventListener("change", () => hostUpdateRules({ guessMode: ui.guessModeInput.value }));
+  ui.imageModeInput.addEventListener("change", () => hostUpdateRules({ imageMode: ui.imageModeInput.value }));
   ui.placeBtn.addEventListener("click", () => {
     const title = canonicalGuessTitle(ui.guessTitle.value);
     const studio = canonicalGuessStudio(ui.guessStudio.value);
