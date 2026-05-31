@@ -1876,6 +1876,28 @@ function joinLobby() {
   });
 }
 
+function monitorIceConnection(conn, myGen) {
+  const pc = conn?.peerConnection;
+  if (!pc) {
+    log("No RTCPeerConnection available to monitor.", "warn");
+    return;
+  }
+  log(`ICE state: ${pc.iceConnectionState} (initial).`);
+  const onChange = () => {
+    if (clientConnectionGen !== myGen) return;
+    const state = pc.iceConnectionState;
+    log(`ICE state changed: ${state}.`, state === "failed" || state === "disconnected" ? "warn" : "ok");
+    if (state === "connected" || state === "completed") {
+      showStatus(`In room ${roomCode}.`, "ok");
+    } else if (state === "failed") {
+      showStatus("Network blocked the direct connection (ICE failed). A relay is required.", "error");
+    } else if (state === "disconnected") {
+      showStatus("Connection unstable — trying to recover...", "warn");
+    }
+  };
+  pc.addEventListener("iceconnectionstatechange", onChange);
+}
+
 function connectToHost(code, username, attempt = 0) {
   const maxAttempts = 3;
   const myGen = ++clientConnectionGen;
@@ -1918,6 +1940,7 @@ function connectToHost(code, username, attempt = 0) {
     ui.roomCodeLabel.textContent = code;
     showStatus(`Connecting to ${code}...`, "ok");
     log(`Connected to ${code}.`);
+    monitorIceConnection(hostConnection, myGen);
   });
 
   hostConnection.on("data", (message) => {
