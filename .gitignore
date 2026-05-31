@@ -1,1 +1,3 @@
 scripts/.steam-preview-*.html
+.DS_Store
+.claude/
