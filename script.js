@@ -53,21 +53,24 @@ const DEFAULT_RULES = {
 const USERNAME_STORAGE_KEY = "pixelTimelineUsername";
 const SESSION_STORAGE_KEY = "pixelTimelineSession";
 const GUIDE_STORAGE_KEY = "pixelTimelineGuideState";
+const ICE_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun.cloudflare.com:3478" },
+  // TURN relay — needed for mobile/CGNAT networks where direct P2P fails
+  { urls: "turn:openrelay.metered.ca:80",       username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443",      username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+];
+
 const PEER_SERVER_CONFIGS = [
-  {},
+  { config: { iceServers: ICE_SERVERS } },
   {
     host: "0.peerjs.com",
     port: 443,
     path: "/peerjs",
     secure: true,
-    config: {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun.cloudflare.com:3478" }
-      ]
-    }
+    config: { iceServers: ICE_SERVERS }
   },
   {
     host: "0.peerjs.com",
@@ -1954,7 +1957,16 @@ function connectToHost(code, username, attempt = 0) {
     if (attempt < MAX_RECONNECT_ATTEMPTS) {
       showStatus("Connection dropped — reconnecting...", "warn");
       log("Connection dropped, retrying...", "warn");
-      setTimeout(() => connectToHost(code, username, attempt + 1), 1500);
+      setTimeout(() => {
+        if (!peer || !peer.open) {
+          openPeer(null, (assignedId) => {
+            peerId = assignedId;
+            connectToHost(code, username, attempt + 1);
+          }, () => setLobbyMode("join_setup"));
+        } else {
+          connectToHost(code, username, attempt + 1);
+        }
+      }, 1500);
     } else {
       showStatus("Lost connection to the room.", "warn");
       log("Disconnected from host after retries.", "warn");
