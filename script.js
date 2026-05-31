@@ -1880,6 +1880,7 @@ function connectToHost(code, username, attempt = 0) {
     clearTimeout(timeout);
     hostConnection.send(buildJoinPayload(username));
     setLobbyMode("connected");
+    renderMainSections();
     ui.roomCodeLabel.textContent = code;
     showStatus(`Joining ${code}...`, "ok");
     log(`Connected to ${code}.`);
